@@ -1,49 +1,15 @@
 # EJERCICIO 1
 ## a) Dibujar un diagrama de flujo de los pasos que realiza el programa como un grafo de dependencias. Explicitar el tipo en Scala de cada conexión.
 
+
+### Pipeline original (sin Spark)
+
+![Pipeline original](data/flujo_prev.png)
+
+### Pipeline distribuido con Spark
 El programa tiene un pipeline casi secuencial, el driver inicializa SparK, carga los datos y luego distribuye el trabajo entre los workers.
 
-  Driver
-    |
-    | Leer suscriptions.json
-    v
-List[Subscription]
-    |
-    | sc.parallelize
-    v
-RDD[Subscripticon]
-
- Workers
-    |
-    | flatMap
-    | Descarga y parseo
-    v
-RDD[Post]
-    |
-    |flatMap
-    | Extraccion de entidades
-    v
-RDD[NamedEntity]
-    |
-    | map
-    | ((entityType, text), 1)
-    v
-RDD[((String, String), Int)]
-    |
-    | sortBy
-    | Ranking
-    v
-RDD[((String, String), Int)]
-
-  Driver
-    |
-    | collect
-    v
-Array[((String, String), Int)]
-    |
-    | Impresion 
-    v
-  Final
+![Pipeline Spark](data/flujo_next.png)
   
 ## b) Para cada caso del pipeline, determinar si puede expresarse como unade las abstracciones de Spark. (map, flatMap, reduceByKey) 
 

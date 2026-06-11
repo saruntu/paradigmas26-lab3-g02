@@ -1,3 +1,21 @@
+#Configuración del entorno
+
+### Instalar dependencias (Spark incluido)
+sbt compile
+
+### Instalación de Java 17 en Linux
+sudo apt update
+sudo apt install openjdk-17-jdk
+java --version
+### En MAC
+brew install openjdk@17
+sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+/usr/libexec/java_home -V
+
+### Correr el programa
+make run
+
+
 # EJERCICIO 1
 ## a) Dibujar un diagrama de flujo de los pasos que realiza el programa como un grafo de dependencias. Explicitar el tipo en Scala de cada conexión.
 
@@ -38,13 +56,14 @@ La etapa de ranking tambien requiere una coordinacion global entre workers, ya q
 Las funciones utilizadas en transformaciones de Spark deben ser serializables, ya que Spark las envia desde el driver hacia los workers para su ejecucion distribuida. Ademas no deben depender de estado compartido mutable ya que cada worker ejecuta su copia independiente de la funcion y no existe memoria compartida entre ellos.
 
 # EJERCICIO 2
+
 ## ¿Qué pasaría si dejaran propagar la excepción dentro del `flatMap`?
 
 Si no manejamos la excepción con un bloque try/catch dentro del `flatMap`, el error (por ejemplo un timeout de red o un JSON malformado) se propaga al worker de Spark. Como Spark es tolerante a fallos, intenta reejecutar esa misma tarea fallida. Si el error persiste debido a que la URL efectivamente está caída o rota, Spark aborta por completo la etapa de ejecución y el Job entero se cancela.
 
 Esto provoca que el programa finalice con error, perdiendo el procesamiento de todas las demás suscripciones de la lista que sí eran válidas. Al capturar la excepción localmente y devolver un iterador vacío (`Iterator.empty`), Spark asume que esa tarea no devolvió posts y continúa procesando el resto de las URLs en paralelo sin interrumpir el flujo principal.
 
-# EJERCICIO 3
+#EJERCICIO 3
 ## reduceByKey es una barrera de sincronización. ¿Qué ocurre en el cluster en ese punto? ¿Por qué es inevitable para este problema?
 Lo que tiene que hacer Spark es reunir todas las apariciones de una misma clave incluso si fue repartida entre distintos workers. Distintos posts pueden contener a la misma entidad (misma clave) y, como cada worker procesa posts distintos, pueden haber apariciones de entidades repartias entre varios workers. Por lo tanto, para obtener el conteo total, hay que si o si reunirlas a todas y sumarlas (es cuando hacemos el reduceByKey). Por eso la sincronizacion es inevitable.
 
@@ -55,44 +74,7 @@ Como Spark combina workers que, en el fondo, son threads diferentes, se puede ge
 La lectura se hace en el driver (con el Dictionary.loadAll). Despues, mediante la broadcast variable (la llamamos dicBroadcast), el diccionario se distribuye a los workers de manera eficiente. Luego, cada worker accede a el mediante dicBroadcast.value.
 Esto se hace para evitar lecturas redundantes que pueden traer mayor costo de ejecucion.
 
-# EJERCICIO 4
-## Accumulators
-Se incorporaron los siguiente accumulators al pipeline:
-+ `feedsSuccess` -> cantidad de feeds descargados exitosamente.
-+ `feedsFailed` -> cantidad de feeds que falló su descarga.
-+ `postsDownloaded` -> cantidad total de posts descargados.
-+ `postsDiscarded` -> cantidad de posts descartados por estar vacios o ser nulos.
-
-## Medicion de tiempos
-Medimos los tiempos con System.currentTimeMillis() antes y despues de cada accion terminal.
-
-+ `isEmpty()` -> aprox 6 seg
-+ `collect()` de posts -> aprox 5 seg
-+ `collect()` del ranking -> aprox 6 seg
-
-## Comparen el tiempo que tarda cada etapa del pipeline que midieron en la versión no paralelizada y la versión con Spark. ¿Qué conclusiones pueden sacar? Para la cantidad de datos que estamos trabajando, ¿se aprecia la diferencia? Justifique por qué. Nota: La comparación debe realizarse en ejecuciones sobre la misma computadora y la misma conexión a internet.
-La comparacion entre la version secuencial y la version con Spark muestra tiempos similares. La version secuencial tardo aproximadamente 25 segundos, mientras que la version con Spark tardo aproximadamente 26 segundos.
-
-La version actual con Spark (al tiempo del ejercicio 4) ejecuta varias acciones terminales (`isEmpty()` y dos llamadas a `collect()`), lo que provoca recomputaciones del pipeline al no utilizarse todavia `cache()`. Por eso no se observa una mejora significativa en esta prueba.
-
-La version con Spark si paraleliza parte del trabajo, pero el volumen de datos es pequeño, se procesan pocos feeds y alrededor de 100 a 125 posts. Para este tamaño de entrada, el costo adicional de Spark (crear la sesion, planificar jobs, dividir el trabajo en stages y tasks, serializar datos y coordinar la ejecuciOn) puede compensar el beneficio de ejecutar tareas en paralelo. Spark resulta mas util cuando la cantidad de datos crece, cuando hay muchos feeds o cuando las etapas costosas del pipeline pueden distribuirse entre varios workers.
-
-(Al tiempo del ejercicio 5) Luego de agregar `cache()`, Spark almaceno el RDD de posts descargados en memoria. Evito que las etapas posteriores tuvieran que repetir la descarga de feeds. En la ejecucion observamos que el conteo de entidades bajo de aproximadamente 5.5 segundos a 0.438 segundos.
-
-## Spark UI
-![Jobs en el Spark UI](data/jobs_sparkUI.jpeg)
-En la pestaña Jobs de Spark UI se observaron tres jobs completados. Cada job corresponde a una accion terminal ejecutada en el programa. El primer job corresponde a la llamada a isEmpty(), utilizada para verificar si se descargaron posts validos. El segundo job corresponde al collect() que trae los posts descargados al driver. El tercer job corresponde al collect() final del conteo de entidades.
-
-Esto muestra que Spark no ejecuta las transformaciones inmediatamente, sino recién cuando aparece una accion terminal.
-Tambien se observa que los tres jobs tardan alrededor de 5 o 6 segundos. Ademas, como todavia no se usa cache(), Spark puede recomputar partes del pipeline en cada acción terminal.
-
-## ¿Por qué los Accumulators solo deben usarse para métricas y no para tomar decisiones lógicas dentro de las etapas distribuidas del pipeline? ¿En qué situación un Accumulator puede dar un valor incorrecto?
-Esto es porque los workers solo incrementan su valor y no tienen acceso a una version global y actualizada durante la ejecucion, el valor final es leido por el driver una vez que se completa una accion terminal. Puede producir valores incorrectos cuando Spark reejecuta tareas, por ejemplo cuando una tarea aumenta un accumulator y luego falla, debe ejecutarse nuevamente y ese incremento puede contabilizarse mas de una vez.
-
-## ¿En qué momento del pipeline está disponible el valor de un Accumulator para ser leído por el driver?
-Cuando los workers terminan sus tareas y se completa la accion terminal.
-
-# EJERCICIO 5
+#EJERCICIO 5
 ## a) ¿Qué ocurriría si no llamaran a cache()? ¿Cuántas veces se ejecutaría la descarga de feeds?
 
 Si no usamos `cache()`, Spark recomputa todo el pipeline desde el principio cada vez que llamamos a una acción, incluyendo las descargas HTTP. En nuestro código la descarga de feeds se ejecutaría tres veces: la primera cuando hacemos `downloadResults.isEmpty()`, la segunda al hacer `downloadResults.collect()`, y la tercera cuando llamamos a `entityCountsRDD.collect()`, ya que este requiere volver a calcular el RDD anterior del que depende.
@@ -104,3 +86,5 @@ Es incorrecto porque la funcion collect se encarga de traer todos los datos obte
 ## c) cache() es también lazy. ¿En qué momento se almacena realmente el RDD en memoria?
 
 Como la funcion `cache()` es lazy, el RDD recién se va a materializar en la memoria de los workers cuando el programa ejecute la primera accion sobre ese RDD. En el caso de nuestro pipeline, se almacena en el momento exacto en el que evaluamos la condición `downloadResults.isEmpty()`.
+
+

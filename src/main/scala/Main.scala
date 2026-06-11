@@ -23,6 +23,10 @@ object Main {
     val feedsSuccess = sc.longAccumulator("feeds exitosos")
     val feedsFailed = sc.longAccumulator("feeds fallidos")
 
+    val postsDownloaded = sc.longAccumulator("posts descargados")
+    val postsDiscarded = sc.longAccumulator("posts descartados")
+    
+
     // Download feeds and parse posts, tracking success/failure
     val downloadResults: RDD[Post] = subscriptionsRDD.flatMap{subscription =>
       
@@ -31,6 +35,7 @@ object Main {
         if(feedOpt.isDefined){
           feedsSuccess.add(1)
           val posts = feedOpt.fold(List[Post]())(JsonParser.parsePosts(_, subscription.name))
+          postsDownloaded.add(posts.size)
           posts.iterator
         }
         else{
@@ -40,17 +45,22 @@ object Main {
         }
       }
       catch{
-        case _: Exception => 
+        case _: Exception =>
+          feedsFailed.add(1)
           println(s"Warning: Failed to download from'${subscription.name}' (${subscription.url})")
           Iterator.empty
       }
     }
-
+    val startIsEmpty = System.currentTimeMillis()
+    
     if (downloadResults.isEmpty()){
       println("Error: No valid subscriptions found")
       sc.stop()
       sys.exit(1)
     }
+    
+    val endIsEmpty = System.currentTimeMillis()
+    println(s"Validation time: ${(endIsEmpty - startIsEmpty)/1000.0} seconds")
 
     // val downloadResults = subscriptions.map { subscription =>
     //   val feedOpt = FileIO.downloadFeed(subscription.url)
@@ -63,8 +73,13 @@ object Main {
     // val feedsFailed = downloadResults.length - feedsSuccess
 
     // Flatten all posts and count JSON parse failures
+    val startResults = System.currentTimeMillis()
+    
     val downloadResultsList: List[Post] = downloadResults.collect().toList
 
+    val endResults = System.currentTimeMillis()
+    println(s"Download time and recollection: ${(endResults - startResults)/1000.0} seconds")
+    
     // val allPosts = downloadResults.flatMap(_._2)
     val postsSuccess = downloadResultsList.length
     val postsFailed = feedsFailed.value
@@ -72,7 +87,8 @@ object Main {
     // Filter empty posts
     val filteredPosts = Analyzer.filterEmptyPosts(downloadResultsList)
     val postsFiltered = downloadResultsList.length - filteredPosts.length
-
+    postsDiscarded.add(postsFiltered)
+    
     // Calculate average characters in filtered posts
     val totalChars = filteredPosts.map(post => post.title.length + post.selftext.length).sum
     val avgChars = if (filteredPosts.nonEmpty) totalChars / filteredPosts.length else 0
@@ -81,9 +97,9 @@ object Main {
     val stats = Map(
       "feedsSuccess" -> feedsSuccess.value.toInt,
       "feedsFailed" -> feedsFailed.value.toInt,
-      "postsSuccess" -> postsSuccess,
+      "postsSuccess" -> postsDownloaded.value.toInt,
       "postsFailed" -> postsFailed.toInt,
-      "postsFiltered" -> postsFiltered,
+      "postsFiltered" -> postsDiscarded.value.toInt,
       "avgChars" -> avgChars
     )
 
@@ -110,11 +126,12 @@ object Main {
     }
     .reduceByKey(_ + _) //agrupo por clave y sumo los valores
 
+    val startEntities = System.currentTimeMillis()
     val rankedEntities = entityCountsRDD.collect().toList //traigo el resultado final al driver
       .sortBy{case((entityType, entityText), count) => (-count, entityType, entityText)} //ordeno por cantidad descendente
-
+    val endEntities = System.currentTimeMillis()
+    println (s"Entities counting time: ${(endEntities - startEntities) / 1000.0} seconds")
     rankedEntities.foreach{case((entityType, entityText), count) => println(s"[${entityType}] ${entityText}: ${count} apariciones")}
-
 
     dicBroadcast.destroy() //libero el broadcast de memoria
   }

@@ -98,20 +98,24 @@ object Main {
     }
 
     // Load dictionaries
-    val dictionary = Dictionary.loadAll(cmdArgs.entitiesDir)
+    val dictionary = Dictionary.loadAll(cmdArgs.entitiesDir)// Cargo el diccionario en el driver
+    val dicBroadcast = sc.broadcast(dictionary) //le mando el diccionario una vez a cada worker para q puedan usarlo
 
-    // Detect entities in all posts (combine title and selftext)
-    val allEntities = filteredPosts.flatMap { post =>
-      val combinedText = post.title + " " + post.selftext
-      Analyzer.detectEntities(combinedText, dictionary)
+    val entityCountsRDD: RDD[((String, String), Int)] = downloadResults.flatMap{post => //Agarro el RDD[Post] y, por c/u, devuelvo >=0 entidades
+      val combinedText = s"${post.title} ${post.selftext}"
+      Analyzer.detectEntities(combinedText, dicBroadcast.value)
     }
+    .map{entity => //convierto cada entidad en un par clave/valor
+      ((entity.entityType, entity.text), 1)
+    }
+    .reduceByKey(_ + _) //agrupo por clave y sumo los valores
 
-    // Count entities
-    val entityCounts = Analyzer.countEntities(allEntities)
-    val typeStats = Analyzer.countByType(allEntities)
+    val rankedEntities = entityCountsRDD.collect().toList //traigo el resultado final al driver
+      .sortBy{case((entityType, entityText), count) => (-count, entityType, entityText)} //ordeno por cantidad descendente
 
-    println(Formatters.formatTypeStats(typeStats))
-    println()
-    println(Formatters.formatEntityStats(entityCounts, cmdArgs.topK))
+    rankedEntities.foreach{case((entityType, entityText), count) => println(s"[${entityType}] ${entityText}: ${count} apariciones")}
+
+
+    dicBroadcast.destroy() //libero el broadcast de memoria
   }
 }

@@ -49,3 +49,15 @@ Como Spark combina workers que, en el fondo, son threads diferentes, se puede ge
 La lectura se hace en el driver (con el Dictionary.loadAll). Despues, mediante la broadcast variable (la llamamos dicBroadcast), el diccionario se distribuye a los workers de manera eficiente. Luego, cada worker accede a el mediante dicBroadcast.value.
 Esto se hace para evitar lecturas redundantes que pueden traer mayor costo de ejecucion.
 
+#EJERCICIO 5
+## a) ¿Qué ocurriría si no llamaran a cache()? ¿Cuántas veces se ejecutaría la descarga de feeds?
+
+Si no usamos `cache()`, Spark recomputa todo el pipeline desde el principio cada vez que llamamos a una acción, incluyendo las descargas HTTP. En nuestro código la descarga de feeds se ejecutaría tres veces: la primera cuando hacemos `downloadResults.isEmpty()`, la segunda al hacer `downloadResults.collect()`, y la tercera cuando llamamos a `entityCountsRDD.collect()`, ya que este requiere volver a calcular el RDD anterior del que depende.
+
+## b) ¿Por qué es incorrecto llamar a collect() entre los pasos a) y b) del ejercicio 3 y luego continuar el pipeline? ¿Qué consecuencia tiene sobre la distribución del trabajo?
+
+Es incorrecto porque la funcion collect se encarga de traer todos los datos obtenidos de los workers devuelta a la memoria del driver. La consecuencia de hacer esto a la mitad del pipeline es que se rompe completamente la paralelización. Todo el procesamiento siguiente se haría de forma secuencial en una sola maquina en vez de aprovechar el cluster, lo que genera un cuello de botella y puede hacer que el driver se quede sin memoria si los datos son muchos.
+
+## c) cache() es también lazy. ¿En qué momento se almacena realmente el RDD en memoria?
+
+Como la funcion `cache()` es lazy, el RDD recién se va a materializar en la memoria de los workers cuando el programa ejecute la primera accion sobre ese RDD. En el caso de nuestro pipeline, se almacena en el momento exacto en el que evaluamos la condición `downloadResults.isEmpty()`.

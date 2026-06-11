@@ -73,9 +73,11 @@ Medimos los tiempos con System.currentTimeMillis() antes y despues de cada accio
 ## Comparen el tiempo que tarda cada etapa del pipeline que midieron en la versión no paralelizada y la versión con Spark. ¿Qué conclusiones pueden sacar? Para la cantidad de datos que estamos trabajando, ¿se aprecia la diferencia? Justifique por qué. Nota: La comparación debe realizarse en ejecuciones sobre la misma computadora y la misma conexión a internet.
 La comparacion entre la version secuencial y la version con Spark muestra tiempos similares. La version secuencial tardo aproximadamente 25 segundos, mientras que la version con Spark tardo aproximadamente 26 segundos.
 
-La version actual con Spark (al tiempo del ejercicio 4) ejecuta varias acciones terminales (`isEmpty()` y dos llamadas a `collect()`), lo que provoca recomputaciones del pipeline al no utilizarse todavia cache(). Por eso no se observa una mejora significativa en esta prueba.
+La version actual con Spark (al tiempo del ejercicio 4) ejecuta varias acciones terminales (`isEmpty()` y dos llamadas a `collect()`), lo que provoca recomputaciones del pipeline al no utilizarse todavia `cache()`. Por eso no se observa una mejora significativa en esta prueba.
 
 La version con Spark si paraleliza parte del trabajo, pero el volumen de datos es pequeño, se procesan pocos feeds y alrededor de 100 a 125 posts. Para este tamaño de entrada, el costo adicional de Spark (crear la sesion, planificar jobs, dividir el trabajo en stages y tasks, serializar datos y coordinar la ejecuciOn) puede compensar el beneficio de ejecutar tareas en paralelo. Spark resulta mas util cuando la cantidad de datos crece, cuando hay muchos feeds o cuando las etapas costosas del pipeline pueden distribuirse entre varios workers.
+
+(Al tiempo del ejercicio 5) Luego de agregar `cache()`, Spark almaceno el RDD de posts descargados en memoria. Evito que las etapas posteriores tuvieran que repetir la descarga de feeds. En la ejecucion observamos que el conteo de entidades bajo de aproximadamente 5.5 segundos a 0.438 segundos.
 
 ## Spark UI
 ![Jobs en el Spark UI](data/jobs_sparkUI.jpeg)
@@ -90,7 +92,7 @@ Esto es porque los workers solo incrementan su valor y no tienen acceso a una ve
 ## ¿En qué momento del pipeline está disponible el valor de un Accumulator para ser leído por el driver?
 Cuando los workers terminan sus tareas y se completa la accion terminal.
 
-#EJERCICIO 5
+# EJERCICIO 5
 ## a) ¿Qué ocurriría si no llamaran a cache()? ¿Cuántas veces se ejecutaría la descarga de feeds?
 
 Si no usamos `cache()`, Spark recomputa todo el pipeline desde el principio cada vez que llamamos a una acción, incluyendo las descargas HTTP. En nuestro código la descarga de feeds se ejecutaría tres veces: la primera cuando hacemos `downloadResults.isEmpty()`, la segunda al hacer `downloadResults.collect()`, y la tercera cuando llamamos a `entityCountsRDD.collect()`, ya que este requiere volver a calcular el RDD anterior del que depende.

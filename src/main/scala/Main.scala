@@ -67,16 +67,6 @@ object Main {
     val endIsEmpty = System.currentTimeMillis()
     println(s"Validation time: ${(endIsEmpty - startIsEmpty)/1000.0} seconds")
 
-    // val downloadResults = subscriptions.map { subscription =>
-    //   val feedOpt = FileIO.downloadFeed(subscription.url)
-    //   val posts = feedOpt.fold(List[Post]())(JsonParser.parsePosts(_, subscription.name))
-    //   (feedOpt.isDefined, posts)
-    // }
-
-    // Count feed successes/failures
-    // val feedsSuccess = downloadResults.count(_._1)
-    // val feedsFailed = downloadResults.length - feedsSuccess
-
     // Flatten all posts and count JSON parse failures
     val startResults = System.currentTimeMillis()
     

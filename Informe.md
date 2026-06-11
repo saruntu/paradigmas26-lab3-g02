@@ -36,7 +36,15 @@ La etapa de ranking tambien requiere una coordinacion global entre workers, ya q
 
 ## d)El mecanismo de extensión (extension point) de Spark es la función que el desarrollador le pasa a cada transformación. ¿Qué restricciones impone Spark sobre esas funciones para que puedan ejecutarse en un entorno distribuido? Piensen en serialización, estado compartido y efectos secundarios.
 
-Las funciones utilizadas en transformaciones de Spark deben ser serializables, ya que Spark las envia desde el driver hacia los workers para su ejecucion distribuida. Ademas no deben depender de estado compartido mutable ya que cada worker ejecuta su copia independiente de la funcion y no existe memoria compartida entre ellos. 
+Las funciones utilizadas en transformaciones de Spark deben ser serializables, ya que Spark las envia desde el driver hacia los workers para su ejecucion distribuida. Ademas no deben depender de estado compartido mutable ya que cada worker ejecuta su copia independiente de la funcion y no existe memoria compartida entre ellos.
+
+# EJERCICIO 2
+
+## ¿Qué pasaría si dejaran propagar la excepción dentro del `flatMap`?
+
+Si no manejamos la excepción con un bloque try/catch dentro del `flatMap`, el error (por ejemplo un timeout de red o un JSON malformado) se propaga al worker de Spark. Como Spark es tolerante a fallos, intenta reejecutar esa misma tarea fallida. Si el error persiste debido a que la URL efectivamente está caída o rota, Spark aborta por completo la etapa de ejecución y el Job entero se cancela.
+
+Esto provoca que el programa finalice con error, perdiendo el procesamiento de todas las demás suscripciones de la lista que sí eran válidas. Al capturar la excepción localmente y devolver un iterador vacío (`Iterator.empty`), Spark asume que esa tarea no devolvió posts y continúa procesando el resto de las URLs en paralelo sin interrumpir el flujo principal.
 
 #EJERCICIO 3
 ## reduceByKey es una barrera de sincronización. ¿Qué ocurre en el cluster en ese punto? ¿Por qué es inevitable para este problema?

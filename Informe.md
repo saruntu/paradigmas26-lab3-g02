@@ -1,3 +1,20 @@
+#Configuración del entorno
+
+### Instalar dependencias (Spark incluido)
+sbt compile
+
+### Instalación de Java 17 en Linux
+sudo apt update
+sudo apt install openjdk-17-jdk
+java --version
+### En MAC
+brew install openjdk@17
+sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+/usr/libexec/java_home -V
+
+### Correr el programa
+make run
+
 # EJERCICIO 1
 ## a) Dibujar un diagrama de flujo de los pasos que realiza el programa como un grafo de dependencias. Explicitar el tipo en Scala de cada conexión.
 

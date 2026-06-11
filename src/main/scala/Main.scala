@@ -51,10 +51,15 @@ object Main {
           Iterator.empty
       }
     }
+    // Solo se conecta una vez a la red y queda en memoria RAM para reutilizar la info
+    downloadResults.cache()
     val startIsEmpty = System.currentTimeMillis()
     
     if (downloadResults.isEmpty()){
       println("Error: No valid subscriptions found")
+
+      //libero cache
+      downloadResults.unpersist()
       sc.stop()
       sys.exit(1)
     }
@@ -134,5 +139,8 @@ object Main {
     rankedEntities.foreach{case((entityType, entityText), count) => println(s"[${entityType}] ${entityText}: ${count} apariciones")}
 
     dicBroadcast.destroy() //libero el broadcast de memoria
+
+    //libero cache
+    downloadResults.unpersist()
   }
 }

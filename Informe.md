@@ -94,7 +94,7 @@ La version actual con Spark (al tiempo del ejercicio 4) ejecuta varias acciones 
 
 La version con Spark si paraleliza parte del trabajo, pero el volumen de datos es pequeño, se procesan pocos feeds y alrededor de 100 a 125 posts. Para este tamaño de entrada, el costo adicional de Spark (crear la sesion, planificar jobs, dividir el trabajo en stages y tasks, serializar datos y coordinar la ejecuciOn) puede compensar el beneficio de ejecutar tareas en paralelo. Spark resulta mas util cuando la cantidad de datos crece, cuando hay muchos feeds o cuando las etapas costosas del pipeline pueden distribuirse entre varios workers.
 
-(Al tiempo del ejercicio 5) Luego de agregar `cache()`, Spark almaceno el RDD de posts descargados en memoria. Evito que las etapas posteriores tuvieran que repetir la descarga de feeds. En la ejecucion observamos que el conteo de entidades bajo de aproximadamente 5.5 segundos a 0.438 segundos.
+(Al tiempo del ejercicio 5) Luego de agregar `cache()`, Spark almaceno el RDD de posts descargados en memoria. Evito que las etapas posteriores tuvieran que repetir la descarga de feeds. En la ejecucion observamos que el conteo de entidades bajo de aproximadamente 5.5 segundos a 0.364 segundos. El total de segundos de la ejecucion fue 21 segundos.
 
 ## Spark UI
 ![Jobs en el Spark UI](data/jobs_sparkUI.jpeg)

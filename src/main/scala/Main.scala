@@ -53,6 +53,12 @@ object Main {
     }
     // Solo se conecta una vez a la red y queda en memoria RAM para reutilizar la info
     downloadResults.cache()
+    val filteredPostsRDD: RDD[Post] = downloadResults.filter { post =>
+  					post.title.nonEmpty &&
+  					post.selftext.nonEmpty &&
+  					post.selftext.trim.nonEmpty
+				}
+    
     val startIsEmpty = System.currentTimeMillis()
     
     if (downloadResults.isEmpty()){
@@ -80,7 +86,7 @@ object Main {
     val postsFailed = feedsFailed.value
 
     // Filter empty posts
-    val filteredPosts = Analyzer.filterEmptyPosts(downloadResultsList)
+    val filteredPosts: List[Post] = filteredPostsRDD.collect().toList
     val postsFiltered = downloadResultsList.length - filteredPosts.length
     postsDiscarded.add(postsFiltered)
     
@@ -112,7 +118,7 @@ object Main {
     val dictionary = Dictionary.loadAll(cmdArgs.entitiesDir)// Cargo el diccionario en el driver
     val dicBroadcast = sc.broadcast(dictionary) //le mando el diccionario una vez a cada worker para q puedan usarlo
 
-    val entityCountsRDD: RDD[((String, String), Int)] = downloadResults.flatMap{post => //Agarro el RDD[Post] y, por c/u, devuelvo >=0 entidades
+    val entityCountsRDD: RDD[((String, String), Int)] = filteredPostsRDD.flatMap{post => //Agarro el RDD[Post] y, por c/u, devuelvo >=0 entidades
       val combinedText = s"${post.title} ${post.selftext}"
       Analyzer.detectEntities(combinedText, dicBroadcast.value)
     }

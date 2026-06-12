@@ -51,11 +51,14 @@ object Dictionary {
 
       val placesOpt = loadFromFile(s"$entitiesDir/places.txt", "Place")
 
+      val technologiesOpt = loadFromFile(s"$entitiesDir/technologies.txt", "Technology")
+
       peopleOpt.getOrElse(List()) :::
         universitiesOpt.getOrElse(List()) :::
         languagesOpt.getOrElse(List()) :::
         organizationsOpt.getOrElse(List()) :::
-        placesOpt.getOrElse(List()) 
+        placesOpt.getOrElse(List()) :::
+        technologiesOpt.getOrElse(List())
       }
       catch{
         case _: Exception => 

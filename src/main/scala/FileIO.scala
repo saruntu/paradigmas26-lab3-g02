@@ -22,11 +22,12 @@ object FileIO {
       val subscriptions = json.extract[List[Map[String, String]]]
 
       subscriptions.map { sub =>
-        if(sub("name").nonEmpty && sub("url").nonEmpty){
-          Some(Subscription(sub("name"), sub("url")))
-        }
-        else{
-          None
+        (sub.get("name"), sub.get("url")) match {
+          case (Some(name), Some(url)) if name.nonEmpty && url.nonEmpty =>
+            Some(Subscription(name, url))
+
+          case _ =>
+            None
         }
       }
     }

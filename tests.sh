@@ -4,7 +4,7 @@
 # Modular test functions for flexibility and extensibility
 
 # Constants
-ENV_VARS="SBT_OPTS=\"--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED\""
+ENV_VARS="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 PATH=\"/usr/lib/jvm/java-17-openjdk-amd64/bin:\$PATH\" SBT_OPTS=\"--add-exports=java.base/sun.nio.ch=ALL-UNNAMED\""
 TESTS_DIR="data"
 PASSED=0
 FAILURES=0

@@ -17,7 +17,14 @@ object Main {
     val subscriptionOpts = FileIO.readSubscriptions(cmdArgs.subscriptionFile)
 
     // Filter out malformed subscriptions (None values)
-    val subscriptions = subscriptionOpts.flatten
+    val subscriptions = subscriptionOpts.flatMap {
+      case Some(subscription) =>
+        Some(subscription)
+
+      case None =>
+        println("Warning: Skipping malformed subscription")
+        None
+    }
     val subscriptionsRDD: RDD[Subscription] = sc.parallelize(subscriptions)
 
     val feedsSuccess = sc.longAccumulator("feeds exitosos")
@@ -40,14 +47,14 @@ object Main {
         }
         else{
           feedsFailed.add(1)
-          println("Warning: Skipping malformed subscription (missing 'name' or 'url' field)")
+          println(s"Warning: Failed to download from '${subscription.name}' (${subscription.url})")
           Iterator.empty
         }
       }
       catch{
         case _: Exception =>
           feedsFailed.add(1)
-          println(s"Warning: Failed to download from'${subscription.name}' (${subscription.url})")
+          println(s"Warning: Failed to download from '${subscription.name}' (${subscription.url})")
           Iterator.empty
       }
     }
@@ -67,7 +74,7 @@ object Main {
       //libero cache
       downloadResults.unpersist()
       sc.stop()
-      sys.exit(1)
+      return
     }
     
     val endIsEmpty = System.currentTimeMillis()
@@ -114,6 +121,15 @@ object Main {
       return
     }
 
+    val entitiesDirFile = new java.io.File(cmdArgs.entitiesDir)
+
+    if (!entitiesDirFile.exists() || !entitiesDirFile.isDirectory) {
+      println(s"Error: entities directory '${cmdArgs.entitiesDir}' not found")
+      downloadResults.unpersist()
+      sc.stop()
+      return
+    }
+
     // Load dictionaries
     val dictionary = Dictionary.loadAll(cmdArgs.entitiesDir)// Cargo el diccionario en el driver
     val dicBroadcast = sc.broadcast(dictionary) //le mando el diccionario una vez a cada worker para q puedan usarlo
@@ -131,8 +147,10 @@ object Main {
     val rankedEntities = entityCountsRDD.collect().toList //traigo el resultado final al driver
       .sortBy{case((entityType, entityText), count) => (-count, entityType, entityText)} //ordeno por cantidad descendente
     val endEntities = System.currentTimeMillis()
-    println (s"Entities counting time: ${(endEntities - startEntities) / 1000.0} seconds")
-    rankedEntities.foreach{case((entityType, entityText), count) => println(s"[${entityType}] ${entityText}: ${count} apariciones")}
+    println(s"Entities counting time: ${(endEntities - startEntities) / 1000.0} seconds")
+
+    val entityCountsMap = rankedEntities.toMap
+    println(Formatters.formatEntityStats(entityCountsMap, cmdArgs.topK))
 
     dicBroadcast.destroy() //libero el broadcast de memoria
 
